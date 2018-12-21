@@ -4,7 +4,6 @@
 
 import 'dart:io';
 
-import 'package:meta/meta.dart';
 import 'package:path/path.dart' as path;
 
 import 'android_repository.dart';
@@ -48,7 +47,7 @@ final Map<String, DownloadTracker> _downloadTrackers =
     <String, DownloadTracker>{};
 void _printDownloadTrackers() {
   for (final DownloadTracker tracker in _downloadTrackers.values) {
-    stdout.write('${tracker.name}: ${tracker.percent} ');
+    stdout.write('${tracker.name.replaceAll('Android ', '')}: ${tracker.percent} ');
   }
 
   if (_downloadTrackers.values

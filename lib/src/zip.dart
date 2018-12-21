@@ -14,13 +14,12 @@ Future<void> unzipFile(String file, Directory outDir) async {
   String command;
   List<String> args;
   if (Platform.isWindows) {
-    command = 'powershell.exe';
-    args = <String>[
-      '-nologo',
-      '-noprofile',
-      '-command',
-      '"& { Add-Type -A \'System.IO.Compression.FileSystem\'; [IO.Compression.ZipFile]::ExtractToDirectory(\'$file\', \'${tempDir.path}\'); }"',
-    ];
+    command = 'powershell.exe  -nologo -noprofile -command '
+        '"& { '
+        'Add-Type -A \'System.IO.Compression.FileSystem\'; '
+        '[IO.Compression.ZipFile]::ExtractToDirectory(\'$file\', \'${tempDir.path}\'); '
+        '}"';
+    args = <String>[];
   } else {
     command = 'unzip';
     args = <String>[
