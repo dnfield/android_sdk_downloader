@@ -33,6 +33,9 @@ Future<void> unzipFile(String file, Directory outDir) async {
     throw Exception('Failed to unzip archive!');
   }
   final Directory dir = await tempDir.list().first;
+  if (await outDir.exists()) {
+    await outDir.delete(recursive: true);
+  }
   await dir.rename(outDir.path);
   await tempDir.delete();
 }

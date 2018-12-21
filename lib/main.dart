@@ -9,6 +9,7 @@ import 'package:args/args.dart';
 import 'package:path/path.dart' as path;
 
 import 'src/android_repository.dart';
+import 'src/checksums.dart';
 import 'src/http.dart';
 import 'src/options.dart';
 import 'src/zip.dart';
@@ -138,61 +139,86 @@ Future<void> main(List<String> args) async {
       Directory(path.join(sdkDir.path, 'platform-tools'));
   final Directory toolsDir = Directory(path.join(sdkDir.path, 'tools'));
 
+  final Map<String, String> checksums =
+      await loadChecksums(options.outDirectory);
+
+  print('Downloading Android SDK and NDK artifacts...');
   final List<Future<void>> futures = <Future<void>>[];
-  if (options.overwrite || !platformDir.existsSync()) {
-    futures.add(downloadArchive(
-      androidRepository.platforms,
-      OptionsRevision(null, options.platformRevision),
-      options.repositoryBase,
-      tempDir,
-    ).then((String zipFileName) async {
-      return unzipFile(zipFileName, platformDir);
-    }));
-  }
-  if (options.overwrite || !buildToolsDir.existsSync()) {
-    futures.add(downloadArchive(
-      androidRepository.buildTools,
-      options.buildToolsRevision,
-      options.repositoryBase,
-      tempDir,
-      osType: options.osType,
-    ).then((String zipFileName) async {
-      return unzipFile(zipFileName, buildToolsDir);
-    }));
-  }
-  if (options.overwrite || !platformToolsDir.existsSync()) {
-    futures.add(downloadArchive(
-      androidRepository.platformTools,
-      options.platformToolsRevision,
-      options.repositoryBase,
-      tempDir,
-      osType: options.osType,
-    ).then((String zipFileName) async {
-      return unzipFile(zipFileName, platformToolsDir);
-    }));
-  }
-  if (options.overwrite || !toolsDir.existsSync()) {
-    futures.add(downloadArchive(
-      androidRepository.tools,
-      options.toolsRevision,
-      options.repositoryBase,
-      tempDir,
-      osType: options.osType,
-    ).then((String zipFileName) async {
-      return unzipFile(zipFileName, toolsDir);
-    }));
-  }
-  if (options.overwrite || !ndkDir.existsSync()) {
-    futures.add(downloadArchive(
-      androidRepository.ndkBundles,
-      options.ndkRevision,
-      options.repositoryBase,
-      tempDir,
-      osType: options.osType,
-    ).then((String zipFileName) {
-      return unzipFile(zipFileName, ndkDir);
-    }));
-  }
+
+  futures.add(downloadArchive(
+    androidRepository.platforms,
+    OptionsRevision(null, options.platformRevision),
+    options.repositoryBase,
+    tempDir,
+    checksumToSkip: options.overwrite ? null : checksums[platformDir.path],
+  ).then((ArchiveDownloadResult result) {
+    if (result != ArchiveDownloadResult.empty) {
+      return unzipFile(result.zipFileName, platformDir).then((_) {
+        checksums[platformDir.path] = result.checksum;
+        return writeChecksums(checksums, options.outDirectory);
+      });
+    }
+  }));
+  futures.add(downloadArchive(
+    androidRepository.buildTools,
+    options.buildToolsRevision,
+    options.repositoryBase,
+    tempDir,
+    osType: options.osType,
+    checksumToSkip: options.overwrite ? null : checksums[buildToolsDir.path],
+  ).then((ArchiveDownloadResult result) async {
+    if (result != ArchiveDownloadResult.empty) {
+      return unzipFile(result.zipFileName, buildToolsDir).then((_) {
+        checksums[buildToolsDir.path] = result.checksum;
+        return writeChecksums(checksums, options.outDirectory);
+      });
+    }
+  }));
+  futures.add(downloadArchive(
+    androidRepository.platformTools,
+    options.platformToolsRevision,
+    options.repositoryBase,
+    tempDir,
+    osType: options.osType,
+    checksumToSkip: options.overwrite ? null : checksums[platformToolsDir.path],
+  ).then((ArchiveDownloadResult result) async {
+    if (result != ArchiveDownloadResult.empty) {
+      return unzipFile(result.zipFileName, platformToolsDir).then((_) {
+        checksums[platformToolsDir.path] = result.checksum;
+        return writeChecksums(checksums, options.outDirectory);
+      });
+    }
+  }));
+  futures.add(downloadArchive(
+    androidRepository.tools,
+    options.toolsRevision,
+    options.repositoryBase,
+    tempDir,
+    osType: options.osType,
+    checksumToSkip: options.overwrite ? null : checksums[toolsDir.path],
+  ).then((ArchiveDownloadResult result) async {
+    if (result != ArchiveDownloadResult.empty) {
+      return unzipFile(result.zipFileName, toolsDir).then((_) {
+        checksums[toolsDir.path] = result.checksum;
+        return writeChecksums(checksums, options.outDirectory);
+      });
+    }
+  }));
+  futures.add(downloadArchive(
+    androidRepository.ndkBundles,
+    options.ndkRevision,
+    options.repositoryBase,
+    tempDir,
+    osType: options.osType,
+    checksumToSkip: options.overwrite ? null : checksums[ndkDir.path],
+  ).then((ArchiveDownloadResult result) async {
+    if (result != ArchiveDownloadResult.empty) {
+      return unzipFile(result.zipFileName, ndkDir).then((_) {
+        checksums[ndkDir.path] = result.checksum;
+        return writeChecksums(checksums, options.outDirectory);
+      });
+    }
+  }));
   await Future.wait<void>(futures);
   await tempDir.delete(recursive: true);
 }

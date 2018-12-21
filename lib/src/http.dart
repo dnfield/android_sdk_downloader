@@ -47,7 +47,8 @@ final Map<String, DownloadTracker> _downloadTrackers =
     <String, DownloadTracker>{};
 void _printDownloadTrackers() {
   for (final DownloadTracker tracker in _downloadTrackers.values) {
-    stdout.write('${tracker.name.replaceAll('Android ', '')}: ${tracker.percent} ');
+    stdout.write(
+        '${tracker.name.replaceAll('Android ', '')}: ${tracker.percent} ');
   }
 
   if (_downloadTrackers.values
@@ -59,13 +60,23 @@ void _printDownloadTrackers() {
   }
 }
 
-Future<String> downloadArchive(
+class ArchiveDownloadResult {
+  const ArchiveDownloadResult(this.zipFileName, this.checksum);
+
+  static const ArchiveDownloadResult empty = ArchiveDownloadResult(null, null);
+
+  final String zipFileName;
+  final String checksum;
+}
+
+Future<ArchiveDownloadResult> downloadArchive(
   List<AndroidRepositoryRemotePackage> packages,
   OptionsRevision revision,
   String repositoryBase,
   Directory outDirectory, {
   OSType osType,
   int apiLevel,
+  String checksumToSkip,
 }) async {
   AndroidRepositoryRemotePackage package;
   for (final AndroidRepositoryRemotePackage p in packages) {
@@ -92,6 +103,11 @@ Future<String> downloadArchive(
           (AndroidRepositoryArchive archive) => archive.hostOS == osType,
         );
 
+  if (archive.checksum == checksumToSkip) {
+    print('Skipping $displayName, checksum matches current asset.');
+    return ArchiveDownloadResult.empty;
+  }
+
   Uri uri = Uri.parse(archive.url);
   if (!uri.isAbsolute) {
     uri = Uri.parse(repositoryBase + archive.url);
@@ -111,5 +127,5 @@ Future<String> downloadArchive(
   }
 
   await httpGet(uri, _handlePlatformZip);
-  return outFileName;
+  return ArchiveDownloadResult(outFileName, archive.checksum);
 }
