@@ -11,6 +11,7 @@ import 'package:path/path.dart' as path;
 import 'src/android_repository.dart';
 import 'src/http.dart';
 import 'src/options.dart';
+import 'src/zip.dart';
 
 const String _androidRepositoryXml =
     'https://dl.google.com/android/repository/repository2-1.xml';
@@ -83,7 +84,12 @@ Future<void> main(List<String> args) async {
     ..addFlag('accept-licenses',
         abbr: 'y',
         defaultsTo: false,
-        help: 'Automatically accept Android SDK licenses.');
+        help: 'Automatically accept Android SDK licenses.')
+    ..addFlag(
+      'overwrite',
+      defaultsTo: false,
+      help: 'Skip download if the target directory exists.',
+    );
 
   final bool help = args.contains('-h') ||
       args.contains('--help') ||
@@ -114,62 +120,81 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  final Directory sdkDir =
-      await _mkdir(path.join(options.outDirectory.path, 'sdk'));
-  final Directory platformDir =
-      await _mkdir(path.join(sdkDir.path, 'platforms'));
-  final Directory buildToolsDir =
-      await _mkdir(path.join(sdkDir.path, 'build-tools'));
+  await options.outDirectory.create(recursive: true);
+
+  final Directory tempDir =
+      await Directory(options.outDirectory.path).createTemp();
+  await tempDir.create(recursive: true);
 
   final Directory ndkDir =
-      await _mkdir(path.join(options.outDirectory.path, 'ndk'));
+      Directory(path.join(options.outDirectory.path, 'ndk'));
+  final Directory sdkDir =
+      Directory(path.join(options.outDirectory.path, 'sdk'));
+  final Directory platformDir = Directory(path.join(
+      sdkDir.path, 'platforms', 'android-${options.platformApiLevel}'));
+  final Directory buildToolsDir = Directory(
+      path.join(sdkDir.path, 'build-tools', options.buildToolsRevision.raw));
+  final Directory platformToolsDir =
+      Directory(path.join(sdkDir.path, 'platform-tools'));
+  final Directory toolsDir = Directory(path.join(sdkDir.path, 'tools'));
 
-  final List<Future<void>> futures = <Future<void>>[
-    downloadAndExtractArchive(
+  final List<Future<void>> futures = <Future<void>>[];
+  if (options.overwrite || !platformDir.existsSync()) {
+    futures.add(downloadArchive(
       androidRepository.platforms,
       OptionsRevision(null, options.platformRevision),
       options.repositoryBase,
-      platformDir,
-      rootOverride: 'android-${options.platformApiLevel}',
-    ),
-    downloadAndExtractArchive(
+      tempDir,
+    ).then((String zipFileName) async {
+      return unzipFile(zipFileName, platformDir);
+    }));
+  }
+  if (options.overwrite || !buildToolsDir.existsSync()) {
+    futures.add(downloadArchive(
       androidRepository.buildTools,
       options.buildToolsRevision,
       options.repositoryBase,
-      buildToolsDir,
-      rootOverride: options.buildToolsRevision.raw,
+      tempDir,
       osType: options.osType,
-    ),
-    downloadAndExtractArchive(
+    ).then((String zipFileName) async {
+      return unzipFile(zipFileName, buildToolsDir);
+    }));
+  }
+  if (options.overwrite || !platformToolsDir.existsSync()) {
+    futures.add(downloadArchive(
       androidRepository.platformTools,
       options.platformToolsRevision,
       options.repositoryBase,
-      sdkDir,
+      tempDir,
       osType: options.osType,
-    ),
-    downloadAndExtractArchive(
+    ).then((String zipFileName) async {
+      return unzipFile(zipFileName, platformToolsDir);
+    }));
+  }
+  if (options.overwrite || !toolsDir.existsSync()) {
+    futures.add(downloadArchive(
       androidRepository.tools,
       options.toolsRevision,
       options.repositoryBase,
-      sdkDir,
+      tempDir,
       osType: options.osType,
-    ),
-    downloadAndExtractArchive(
+    ).then((String zipFileName) async {
+      return unzipFile(zipFileName, toolsDir);
+    }));
+  }
+  if (options.overwrite || !ndkDir.existsSync()) {
+    futures.add(downloadArchive(
       androidRepository.ndkBundles,
       options.ndkRevision,
       options.repositoryBase,
-      ndkDir,
-      rootOverride: '',
+      tempDir,
       osType: options.osType,
-    ),
-  ];
+    ).then((String zipFileName) {
+      return unzipFile(zipFileName, ndkDir);
+    }));
+  }
   await Future.wait<void>(futures);
-  print('Done.');
-}
-
-Future<Directory> _mkdir(String dir) async {
-  final Directory directory = Directory(dir);
-  return await directory.create(recursive: true);
+  await tempDir.delete(recursive: true);
 }
 
 Future<AndroidRepository> _getAndroidRepository(Uri repositoryXmlUri) async {

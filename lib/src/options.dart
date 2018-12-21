@@ -46,19 +46,21 @@ class OptionsRevision {
 }
 
 class Options {
-  const Options(
-      {@required this.platformApiLevel,
-      @required this.platformRevision,
-      @required this.repositoryXml,
-      @required this.repositoryXmlUri,
-      @required this.buildToolsRevision,
-      @required this.platformToolsRevision,
-      @required this.toolsRevision,
-      @required this.ndkRevision,
-      @required this.outDirectory,
-      @required this.repositoryBase,
-      @required this.osType,
-      this.acceptLicenses = false});
+  const Options({
+    @required this.platformApiLevel,
+    @required this.platformRevision,
+    @required this.repositoryXml,
+    @required this.repositoryXmlUri,
+    @required this.buildToolsRevision,
+    @required this.platformToolsRevision,
+    @required this.toolsRevision,
+    @required this.ndkRevision,
+    @required this.outDirectory,
+    @required this.repositoryBase,
+    @required this.osType,
+    this.acceptLicenses = false,
+    this.overwrite = false,
+  });
 
   static Options parseAndValidate(List<String> args, ArgParser argParser) {
     final ArgResults argResults = argParser.parse(args);
@@ -106,6 +108,7 @@ class Options {
       ndkRevision: OptionsRevision.fromRaw(rawNdkVersion),
       osType: osTypeMap[argResults['os']],
       acceptLicenses: argResults['accept-licenses'],
+      overwrite: argResults['overwrite'],
     );
   }
 
@@ -121,4 +124,5 @@ class Options {
   final Directory outDirectory;
   final OSType osType;
   final bool acceptLicenses;
+  final bool overwrite;
 }
